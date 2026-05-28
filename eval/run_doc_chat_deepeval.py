@@ -10,10 +10,7 @@ from deepeval.test_case import LLMTestCase
 from deepeval.metrics import (
     AnswerRelevancyMetric,
     FaithfulnessMetric,
-    ContextualPrecisionMetric,
-    ContextualRecallMetric,
     ContextualRelevancyMetric,
-    HallucinationMetric,
 )
 from deepeval import evaluate
 from deepeval.models.base_model import DeepEvalBaseLLM
@@ -124,11 +121,10 @@ def main():
                 self.expected_output = exp
         goldens = [
             _G("What is this document about?"),
-            _G("Summarize the key points from the document."),
         ]
 
     # 3) For each golden, query RAG and build test cases
-    for golden in goldens:
+    for golden in goldens[:1]:
         try:
             result = query_rag(golden.input, session_id=chat_ingestor.session_id)
             test_case = LLMTestCase(
@@ -142,15 +138,12 @@ def main():
         except Exception as e:
             log.error("Failed to build test case", error=str(e), question=golden.input)
 
-    # 4) Evaluate with all metrics
+    # 4) Evaluate with a subset of metrics to stay within Groq free-tier TPM
     judge = GroqJudge()
     metrics = [
         AnswerRelevancyMetric(model=judge),
         FaithfulnessMetric(model=judge),
-        ContextualPrecisionMetric(model=judge),
-        ContextualRecallMetric(model=judge),
         ContextualRelevancyMetric(model=judge),
-        HallucinationMetric(model=judge),
     ]
 
     try:

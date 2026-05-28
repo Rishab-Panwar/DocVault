@@ -14,6 +14,13 @@ from logger import GLOBAL_LOGGER as log
 from prompt.prompt_library import PROMPT_REGISTRY
 from model.models import PromptType
 
+try:
+    from langchain.retrievers import ContextualCompressionRetriever
+    from langchain_community.document_compressors import FlashrankRerank
+    _RERANKER_AVAILABLE = True
+except ImportError:
+    _RERANKER_AVAILABLE = False
+
 
 class ConversationalRAG:
     """
@@ -58,9 +65,15 @@ class ConversationalRAG:
         index_name: str = "index",
         search_type: str = "similarity",
         search_kwargs: Optional[Dict[str, Any]] = None,
+        use_reranker: bool = True,
+        reranker_top_n: int = 3,
     ):
         """
         Load FAISS vectorstore from disk and build retriever + LCEL chain.
+
+        When use_reranker=True and flashrank is installed, wraps the base FAISS
+        retriever with FlashrankRerank so the top-k chunks are re-scored by a
+        cross-encoder before being passed to the LLM.
         """
         try:
             if not os.path.isdir(index_path):
@@ -71,15 +84,28 @@ class ConversationalRAG:
                 index_path,
                 embeddings,
                 index_name=index_name,
-                allow_dangerous_deserialization=True,  # ok if you trust the index
+                allow_dangerous_deserialization=True,
             )
 
             if search_kwargs is None:
                 search_kwargs = {"k": k}
 
-            self.retriever = vectorstore.as_retriever(
+            self._base_retriever = vectorstore.as_retriever(
                 search_type=search_type, search_kwargs=search_kwargs
             )
+
+            if use_reranker and _RERANKER_AVAILABLE:
+                compressor = FlashrankRerank(top_n=reranker_top_n)
+                self.retriever = ContextualCompressionRetriever(
+                    base_compressor=compressor,
+                    base_retriever=self._base_retriever,
+                )
+                log.info("Reranker enabled", top_n=reranker_top_n, session_id=self.session_id)
+            else:
+                self.retriever = self._base_retriever
+                if use_reranker and not _RERANKER_AVAILABLE:
+                    log.warning("flashrank not installed — reranker disabled", session_id=self.session_id)
+
             self._build_lcel_chain()
 
             log.info(
@@ -190,17 +216,16 @@ class ConversationalRAG:
             if self.retriever is None:
                 raise DocumentPortalException("No retriever set. Call load_retriever_from_faiss first.", sys)
             
-            # If k is provided, temporarily update the retriever's search kwargs
+            # Temporarily update k on the base retriever (works for both plain and compressed)
+            base = getattr(self, "_base_retriever", self.retriever)
             if k is not None:
-                original_k = self.retriever.search_kwargs.get("k")
-                self.retriever.search_kwargs["k"] = k
-            
-            # Retrieve documents
+                original_k = base.search_kwargs.get("k")
+                base.search_kwargs["k"] = k
+
             docs = self.retriever.invoke(question)
-            
-            # Restore original k if it was modified
+
             if k is not None and original_k is not None:
-                self.retriever.search_kwargs["k"] = original_k
+                base.search_kwargs["k"] = original_k
             
             # Format and return the context
             context = self._format_docs(docs)

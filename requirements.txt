@@ -35,4 +35,7 @@ sqlalchemy>=2
 aiosqlite
 passlib[bcrypt]
 pyjwt
+flashrank
+langgraph
+mcp[cli]
 -e .

@@ -20,6 +20,7 @@ from utils.model_loader import ModelLoader
 from src.document_analyzer.data_analysis import DocumentAnalyzer
 from src.document_compare.document_comparator import DocumentComparatorLLM
 from src.document_chat.retrieval import ConversationalRAG
+from src.document_chat.agent_rag import AgenticRAG
 from utils.document_ops import FastAPIFileAdapter,read_pdf_via_handler
 from logger import GLOBAL_LOGGER as log
 from utils.llm_cache import init_llm_cache
@@ -273,6 +274,44 @@ async def chat_query(
     except Exception as e:
         log.exception("Chat query failed")
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
+
+# ---------- CHAT: AGENT QUERY (LangGraph) ----------
+@app.post("/chat/agent_query")
+async def agent_query(
+    request: Request,
+    question: str = Form(...),
+    session_id: str = Form(...),
+    k: int = Form(10),
+    user: Optional[User] = Depends(fastapi_users.current_user(optional=True)),
+) -> Any:
+    """
+    Agentic RAG endpoint backed by a LangGraph graph.
+
+    Unlike /chat/query, this endpoint grades retrieved documents for relevance
+    and rewrites the query up to 2 times if the retrieved chunks are not
+    relevant — giving more accurate answers for ambiguous questions.
+    """
+    try:
+        if not user and not _is_test_request(request):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+
+        index_dir = os.path.join(FAISS_BASE, session_id)
+        if not os.path.isdir(index_dir):
+            raise HTTPException(status_code=404, detail=f"FAISS index not found at: {index_dir}")
+
+        log.info(f"Received agent query: '{question}' | session: {session_id}")
+        rag = AgenticRAG(session_id=session_id)
+        rag.load_retriever_from_faiss(index_dir, k=k, index_name=FAISS_INDEX_NAME)
+        answer = rag.invoke(question)
+
+        log.info("Agent query handled successfully.")
+        return {"answer": answer, "session_id": session_id, "k": k, "engine": "LangGraph-AgenticRAG"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.exception("Agent query failed")
+        raise HTTPException(status_code=500, detail=f"Agent query failed: {e}")
+
 
 # command for executing the fast api
 # uvicorn api.main:app --port 8080 --reload

@@ -64,6 +64,7 @@ jobs:
           CONFIDENT_API_KEY: ${{ secrets.CONFIDENT_API_KEY }}
           DEEPEVAL_INPUT_DIR: data_deep_eval
           DEEPEVAL_DATASET_ALIAS: test_doc_chat
+          LLM_PROVIDER: groq
         run: python eval/run_doc_chat_deepeval.py
 
   deepeval-mm:
@@ -100,4 +101,5 @@ jobs:
           CONFIDENT_API_KEY: ${{ secrets.CONFIDENT_API_KEY }}
           DEEPEVAL_INPUT_DIR: data_deep_eval
           DEEPEVAL_DATASET_ALIAS: test_doc_chat_mm
+          LLM_PROVIDER: groq
         run: python eval/run_mm_doc_chat_deepeval.py

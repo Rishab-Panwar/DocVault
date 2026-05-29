@@ -2,348 +2,513 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Document Portal</title>
+  <title>DocVault</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Google Fonts for classy look -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="/static/style.css" rel="stylesheet" />
 </head>
 <body>
-  <header class="app-header">
-    <div class="brand">
-      <span class="logo">📚</span>
-      <h1>Document Portal</h1>
-    </div>
-    <nav class="mode-switch">
-      <button class="tab-btn active" data-tab="analysis">Document Analysis</button>
-      <button class="tab-btn" data-tab="compare">Document Compare</button>
-      <button class="tab-btn" data-tab="chat">Doc Chat</button>
-    </nav>
-  </header>
+<!-- Toast container -->
+<div id="toast-container"></div>
 
-  <main class="container">
-    <!-- ============== ANALYSIS ============== -->
-    <section id="tab-analysis" class="tab-panel active">
-      <div class="card">
-        <h2>🔎 Analyze a Document</h2>
-        <p class="muted">Upload a file and get structured analysis.</p>
-        <form id="form-analyze" class="form-grid" onsubmit="return false;">
-          <div class="field">
-            <label for="an-file">Upload file</label>
-            <input id="an-file" type="file" accept=".pdf,.docx,.pptx,.md,.txt,.xlsx,.xls,.csv,.db,.sqlite,.sqlite3" required />
-            <small class="help">Supported files: .pdf, .docx, .pptx, .md, .txt, .xlsx, .xls, .csv, .db, .sqlite, .sqlite3</small>
-          </div>
-          <div class="actions">
-            <button id="btn-analyze" class="btn primary">Run Analysis</button>
-          </div>
-        </form>
-        <div id="an-result" class="result-block">
-          <h3>Result</h3>
-          <pre class="code" id="an-json">Waiting for analysis…</pre>
+<div class="app-layout">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-icon">🔐</div>
+      <span class="sidebar-name">DocVault</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-label">Features</div>
+
+      <button class="nav-item active" data-tab="chat">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>Doc Chat</span>
+      </button>
+
+      <button class="nav-item" data-tab="analysis">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span>Analyze</span>
+      </button>
+
+      <button class="nav-item" data-tab="compare">
+        <svg viewBox="0 0 24 24"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
+        <span>Compare</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <button class="nav-item danger" id="btn-logout">
+        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span>Sign out</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <div class="main-content">
+
+    <!-- ====== CHAT TAB ====== -->
+    <section id="tab-chat" class="tab-panel active">
+      <div class="panel-header">
+        <div>
+          <h2>Doc Chat</h2>
+          <p class="ph-sub">Upload documents, build an index, then ask questions</p>
         </div>
+        <div class="engine-toggle">
+          <span id="engine-label-std" class="muted small">Standard RAG</span>
+          <label class="switch" title="Toggle agentic mode">
+            <input id="use-agent" type="checkbox" />
+            <span class="slider"></span>
+          </label>
+          <span id="engine-label-ag" class="small" style="color:var(--accent-2)">Agentic</span>
+        </div>
+      </div>
+
+      <div class="chat-layout">
+
+        <!-- Left: settings -->
+        <div class="chat-settings">
+
+          <div class="settings-card">
+            <div class="settings-card-title">Documents</div>
+            <div class="drop-zone" id="drop-zone">
+              <div class="dz-icon">📄</div>
+              <p class="dz-title">Drop files here</p>
+              <p class="dz-hint">PDF, DOCX, TXT, PPTX, CSV…</p>
+              <input id="chat-files" type="file" multiple accept=".pdf,.docx,.txt,.pptx,.md,.csv,.xlsx,.xls,.db,.sqlite,.sqlite3" />
+            </div>
+            <div id="file-list" class="file-list"></div>
+            <button id="btn-build" class="btn primary full">
+              <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              Build Index
+            </button>
+            <div id="session-badge" class="session-badge" style="margin-top:10px"></div>
+          </div>
+
+          <div class="settings-card">
+            <details class="adv">
+              <summary>Advanced settings</summary>
+              <div class="adv-grid">
+                <div class="field">
+                  <label>Session ID</label>
+                  <input id="chat-session" type="text" placeholder="auto-generated" />
+                </div>
+                <div class="field">
+                  <label>Chunk size</label>
+                  <input id="chat-chunk" type="number" value="1000" min="200" step="100" />
+                </div>
+                <div class="field">
+                  <label>Chunk overlap</label>
+                  <input id="chat-overlap" type="number" value="200" min="0" step="50" />
+                </div>
+                <div class="field">
+                  <label>Top-K results</label>
+                  <input id="chat-k" type="number" value="5" min="1" max="20" />
+                </div>
+                <div class="field toggle-row">
+                  <span class="flabel">Session-based FAISS</span>
+                  <label class="switch"><input id="chat-sessionized" type="checkbox" checked /><span class="slider"></span></label>
+                </div>
+                <div class="field toggle-row">
+                  <span class="flabel">Multimodal (images)</span>
+                  <label class="switch"><input id="chat-mm" type="checkbox" /><span class="slider"></span></label>
+                </div>
+              </div>
+            </details>
+          </div>
+
+        </div>
+
+        <!-- Right: messages + input -->
+        <div class="chat-main">
+          <div class="messages" id="messages">
+            <div class="message assistant">
+              <div class="bubble">
+                👋 Hi! Upload your documents on the left and click <strong>Build Index</strong>. Then ask me anything about them.
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-input-bar">
+            <input id="chat-q" type="text" placeholder="Ask a question about your documents…" autocomplete="off" />
+            <button id="btn-ask" class="btn primary icon-only" title="Send">
+              <svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+
       </div>
     </section>
 
-    <!-- ============== COMPARE ============== -->
-    <section id="tab-compare" class="tab-panel">
-      <div class="card">
-        <h2>🆚 Compare Two Documents</h2>
-        <p class="muted">Upload a reference file and an actual file to see page-wise differences.</p>
-        <form id="form-compare" class="form-grid-2" onsubmit="return false;">
-          <div class="field">
-            <label for="cmp-ref">Reference file</label>
-            <input id="cmp-ref" type="file" accept=".pdf,.docx,.pptx,.md,.txt,.xlsx,.xls,.csv,.db,.sqlite,.sqlite3" required />
-          </div>
-          <div class="field">
-            <label for="cmp-act">Actual file</label>
-            <input id="cmp-act" type="file" accept=".pdf,.docx,.pptx,.md,.txt,.xlsx,.xls,.csv,.db,.sqlite,.sqlite3" required />
-          </div>
-          <div class="actions span-2">
-            <button id="btn-compare" class="btn primary">Compare</button>
-          </div>
-        </form>
+    <!-- ====== ANALYSIS TAB ====== -->
+    <section id="tab-analysis" class="tab-panel">
+      <div class="panel-header">
+        <div>
+          <h2>Analyze Document</h2>
+          <p class="ph-sub">Extract structured metadata from any document using LLM</p>
+        </div>
+      </div>
+      <div class="panel-body">
 
-        <div id="cmp-result" class="result-block">
-          <h3>Comparison Result</h3>
+        <div class="form-card">
+          <div class="form-card-title">Upload document</div>
+          <div class="upload-drop" id="an-drop">
+            <div class="upload-drop-icon">🔍</div>
+            <p>Drop your document here</p>
+            <p class="ud-hint">PDF, DOCX, PPTX, MD, TXT, XLSX, CSV, SQLite</p>
+            <p class="selected-name" id="an-filename"></p>
+            <input id="an-file" type="file" accept=".pdf,.docx,.pptx,.md,.txt,.xlsx,.xls,.csv,.db,.sqlite,.sqlite3" />
+          </div>
+          <button id="btn-analyze" class="btn primary">
+            <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Run Analysis
+          </button>
+        </div>
+
+        <div class="result-card">
+          <div class="result-card-head">
+            📋 Result
+          </div>
+          <pre class="code" id="an-json">Run analysis to see structured output here…</pre>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ====== COMPARE TAB ====== -->
+    <section id="tab-compare" class="tab-panel">
+      <div class="panel-header">
+        <div>
+          <h2>Compare Documents</h2>
+          <p class="ph-sub">Page-by-page diff between two document versions</p>
+        </div>
+      </div>
+      <div class="panel-body">
+
+        <div class="form-card">
+          <div class="form-card-title">Upload documents</div>
+          <div class="compare-row">
+            <div>
+              <div class="upload-drop" id="ref-drop">
+                <div class="upload-drop-icon">📄</div>
+                <p>Reference file</p>
+                <p class="ud-hint">Original version</p>
+                <p class="selected-name" id="ref-filename"></p>
+                <input id="cmp-ref" type="file" accept=".pdf,.docx,.pptx,.md,.txt,.xlsx,.xls,.csv,.db,.sqlite,.sqlite3" />
+              </div>
+            </div>
+            <div>
+              <div class="upload-drop" id="act-drop">
+                <div class="upload-drop-icon">📝</div>
+                <p>Actual file</p>
+                <p class="ud-hint">Updated version</p>
+                <p class="selected-name" id="act-filename"></p>
+                <input id="cmp-act" type="file" accept=".pdf,.docx,.pptx,.md,.txt,.xlsx,.xls,.csv,.db,.sqlite,.sqlite3" />
+              </div>
+            </div>
+          </div>
+          <button id="btn-compare" class="btn primary">
+            <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
+            Compare
+          </button>
+        </div>
+
+        <div class="result-card">
+          <div class="result-card-head">🆚 Comparison Result</div>
           <div class="table-wrap">
             <table id="cmp-table">
-              <thead>
-                <tr><th>Page</th><th>Changes</th></tr>
-              </thead>
+              <thead><tr><th>Page</th><th>Changes</th></tr></thead>
               <tbody>
-                <tr><td colspan="2" class="muted center">No data yet.</td></tr>
+                <tr><td class="td-page" colspan="2" style="color:var(--muted);text-align:center;padding:20px">No comparison yet.</td></tr>
               </tbody>
             </table>
           </div>
         </div>
+
       </div>
     </section>
 
-    <!-- ============== CHAT ============== -->
-    <section id="tab-chat" class="tab-panel">
-      <div class="card">
-        <h2>💬 Chat with your Documents</h2>
-        <p class="muted">Upload PDF/DOCX/TXT; we’ll index to FAISS and enable RAG chat.</p>
+  </div><!-- /main-content -->
+</div><!-- /app-layout -->
 
-        <form id="form-chat-index" class="form-grid" onsubmit="return false;">
-          <div class="field">
-            <label for="chat-files">Upload files</label>
-            <input id="chat-files" type="file" multiple accept=".pdf,.docx,.txt" />
-            <small class="help">You can select multiple files.</small>
-          </div>
+<script>
+const API_BASE = "";
+const tokenKey = "dp_jwt";
+function getToken() { return localStorage.getItem(tokenKey); }
+function authHeader() { const t = getToken(); return t ? { "Authorization": `Bearer ${t}` } : {}; }
 
-          <div class="grid-3">
-            <div class="field">
-              <label for="chat-session">Session ID (optional)</label>
-              <input id="chat-session" type="text" placeholder="Leave blank for auto session" />
-            </div>
-            <div class="field">
-              <label for="chat-chunk">Chunk size</label>
-              <input id="chat-chunk" type="number" value="1000" min="200" step="100" />
-            </div>
-            <div class="field">
-              <label for="chat-overlap">Chunk overlap</label>
-              <input id="chat-overlap" type="number" value="200" min="0" step="50" />
-            </div>
-          </div>
+if (!getToken()) window.location.href = "/login";
 
-          <div class="grid-3">
-            <div class="field">
-              <label for="chat-k">Top-K</label>
-              <input id="chat-k" type="number" value="5" min="1" max="20" />
-            </div>
-            <div class="field toggle-row">
-              <label>Use session-based FAISS</label>
-              <label class="switch">
-                <input id="chat-sessionized" type="checkbox" checked />
-                <span class="slider"></span>
-              </label>
-            </div>
-            <div class="field toggle-row">
-              <label>Use multimodal (tables + images)</label>
-              <label class="switch">
-                <input id="chat-mm" type="checkbox" />
-                <span class="slider"></span>
-              </label>
-            </div>
-          </div>
+// ===== TOAST =====
+function toast(msg, type = "info") {
+  const c = document.getElementById("toast-container");
+  const el = document.createElement("div");
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span class="toast-dot"></span>${msg}`;
+  c.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
 
-          <div class="actions">
-            <button id="btn-build" class="btn primary">Build / Update Index</button>
-          </div>
-        </form>
-
-        <div class="divider"></div>
-
-        <form id="form-chat-ask" class="form-grid" onsubmit="return false;">
-          <div class="field">
-            <label for="chat-q">Your Question</label>
-            <input id="chat-q" type="text" placeholder="Ask a question about your documents…" />
-          </div>
-          <div class="actions">
-            <button id="btn-ask" class="btn">Send</button>
-          </div>
-        </form>
-
-        <div id="chat-meta" class="muted small"></div>
-
-        <div id="chat-ans" class="result-block">
-          <h3>Answer</h3>
-          <div class="answer" id="chat-answer">No answer yet.</div>
-        </div>
-      </div>
-    </section>
-
-  </main>
-
-  <footer class="app-footer">
-    <div>© Document Portal • Demo UI</div>
-    <div class="tiny">Frontend only – hook to your FastAPI later.</div>
-  </footer>
-
-  <script>
-  // Base URL for API (same origin when opened via FastAPI)
-  const API_BASE = "";
-  // Minimal auth helpers available early
-  const tokenKey = "dp_jwt";
-  function getToken() { return localStorage.getItem(tokenKey); }
-  function setToken(t) { if (t) localStorage.setItem(tokenKey, t); }
-  function clearToken() { localStorage.removeItem(tokenKey); }
-  function authHeader() {
-    const t = getToken();
-    return t ? { "Authorization": `Bearer ${t}` } : {};
-  }
-  // Redirect to /login if not authenticated
-  if (!getToken()) {
-    window.location.href = "/login";
-  }
-
-  // Tab switching (unchanged)
-  const tabs = document.querySelectorAll(".tab-btn");
-  const panels = document.querySelectorAll(".tab-panel");
-  function selectTab(tabName){
-    tabs.forEach(b => b.classList.remove("active"));
-    panels.forEach(p => p.classList.remove("active"));
-    const btn = Array.from(tabs).find(b => b.dataset.tab === tabName);
-    const panel = document.getElementById("tab-" + tabName);
-    if (btn) btn.classList.add("active");
-    if (panel) panel.classList.add("active");
-  }
-  tabs.forEach(btn => {
-    btn.addEventListener("click", () => {
-      tabs.forEach(b => b.classList.remove("active"));
-      panels.forEach(p => p.classList.remove("active"));
-      btn.classList.add("active");
-      document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
-    });
+// ===== SIDEBAR NAV =====
+document.querySelectorAll(".nav-item[data-tab]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".nav-item[data-tab]").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
   });
-  // Respect ?tab=analysis|compare|chat or #analysis etc.
+});
+
+// ===== LOGOUT =====
+document.getElementById("btn-logout").addEventListener("click", async () => {
+  try { await fetch("/auth/cookie/logout", { method: "POST" }); } catch (_) {}
+  localStorage.removeItem(tokenKey);
+  window.location.href = "/login";
+});
+
+// ===== CHAT — DROP ZONE =====
+const dropZone = document.getElementById("drop-zone");
+const chatFiles = document.getElementById("chat-files");
+const fileList = document.getElementById("file-list");
+
+["dragenter","dragover"].forEach(e => dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.add("drag-over"); }));
+["dragleave","drop"].forEach(e => dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.remove("drag-over"); }));
+dropZone.addEventListener("drop", ev => { chatFiles.files = ev.dataTransfer.files; renderFiles(); });
+chatFiles.addEventListener("change", renderFiles);
+
+function renderFiles() {
+  fileList.innerHTML = "";
+  [...chatFiles.files].forEach(f => {
+    const chip = document.createElement("div");
+    chip.className = "file-chip";
+    chip.innerHTML = `<span>📎</span><span>${f.name}</span>`;
+    fileList.appendChild(chip);
+  });
+}
+
+// ===== CHAT — ENGINE TOGGLE =====
+const useAgent = document.getElementById("use-agent");
+const stdLabel = document.getElementById("engine-label-std");
+const agLabel = document.getElementById("engine-label-ag");
+useAgent.addEventListener("change", () => {
+  stdLabel.style.color = useAgent.checked ? "var(--muted)" : "var(--text)";
+  agLabel.style.color = useAgent.checked ? "var(--accent-2)" : "var(--muted)";
+});
+
+// ===== CHAT — BUILD INDEX =====
+let currentSession = null;
+const sessionBadge = document.getElementById("session-badge");
+
+document.getElementById("btn-build").addEventListener("click", async () => {
+  const files = chatFiles.files;
+  if (!files.length) { toast("Upload at least one file first.", "error"); return; }
+
+  const btn = document.getElementById("btn-build");
+  const origText = btn.innerHTML;
+  btn.classList.add("loading");
+  btn.innerHTML = "";
+
   try {
-    const url = new URL(window.location.href);
-    const tabParam = url.searchParams.get("tab") || (location.hash ? location.hash.substring(1) : null);
-    if (tabParam) selectTab(tabParam);
-  } catch(_) {}
+    const fd = new FormData();
+    [...files].forEach(f => fd.append("files", f));
+    const sid = document.getElementById("chat-session").value.trim();
+    if (sid) fd.append("session_id", sid);
+    fd.append("use_session_dirs", document.getElementById("chat-sessionized").checked ? "true" : "false");
+    fd.append("chunk_size", document.getElementById("chat-chunk").value || "1000");
+    fd.append("chunk_overlap", document.getElementById("chat-overlap").value || "200");
+    fd.append("k", document.getElementById("chat-k").value || "5");
+    fd.append("multimodal", document.getElementById("chat-mm").checked ? "true" : "false");
 
-  // (Auth UI removed)
-  // ===== ANALYZE =====
-  document.getElementById("btn-analyze").addEventListener("click", async () => {
-    const file = document.getElementById("an-file").files[0];
-    const out  = document.getElementById("an-json");
-    if (!file) { out.textContent = "Please upload a PDF."; return; }
+    const res = await fetch(`${API_BASE}/chat/index`, { method: "POST", headers: { ...authHeader() }, body: fd });
+    if (!res.ok) { const e = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(e.detail || `HTTP ${res.status}`); }
+    const json = await res.json();
+    currentSession = json.session_id || sid || null;
+    sessionBadge.textContent = `✓ Session: ${currentSession || "(none)"}  ·  k=${json.k}`;
+    sessionBadge.classList.add("visible");
+    toast("Index built successfully.", "success");
+    addMessage("assistant", `Index ready! I've indexed ${files.length} file${files.length > 1 ? "s" : ""}. Ask me anything.`);
+  } catch (e) {
+    toast("Indexing failed: " + (e.message || e), "error");
+  } finally {
+    btn.classList.remove("loading");
+    btn.innerHTML = origText;
+  }
+});
 
-    try {
-      out.textContent = "Running analysis…";
-      const fd = new FormData();
-      fd.append("file", file); // <-- must be 'file' to match FastAPI
+// ===== CHAT — MESSAGES =====
+const messagesEl = document.getElementById("messages");
 
-      const res = await fetch(`${API_BASE}/analyze`, { method: "POST", headers: { ...authHeader() }, body: fd });
-      if (!res.ok) {
-        const err = await res.json().catch(()=>({detail:res.statusText}));
-        throw new Error(err.detail || `HTTP ${res.status}`);
-      }
-      const json = await res.json();
-      out.textContent = JSON.stringify(json, null, 2);
-    } catch (e) {
-      out.textContent = "Error: " + (e.message || e);
-    }
-  });
+function addMessage(role, text, engine) {
+  const wrap = document.createElement("div");
+  wrap.className = `message ${role}`;
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.textContent = text;
+  if (engine) {
+    const tag = document.createElement("div");
+    tag.className = `eng-tag ${engine === "LangGraph-AgenticRAG" ? "agent" : "lcel"}`;
+    tag.textContent = engine === "LangGraph-AgenticRAG" ? "Agentic RAG" : "Standard RAG";
+    bubble.appendChild(tag);
+  }
+  wrap.appendChild(bubble);
+  messagesEl.appendChild(wrap);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return bubble;
+}
 
-  // ===== COMPARE =====
-  document.getElementById("btn-compare").addEventListener("click", async () => {
-    const ref   = document.getElementById("cmp-ref").files[0];
-    const act   = document.getElementById("cmp-act").files[0];
-    const tbody = document.querySelector("#cmp-table tbody");
+function addThinking() {
+  const wrap = document.createElement("div");
+  wrap.className = "message assistant";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble thinking";
+  bubble.textContent = "Thinking…";
+  wrap.appendChild(bubble);
+  messagesEl.appendChild(wrap);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return wrap;
+}
 
-    if (!ref || !act) {
-      tbody.innerHTML = `<tr><td colspan="2" class="muted center">Upload both PDFs.</td></tr>`;
-      return;
-    }
+// ===== CHAT — ASK =====
+const askBtn = document.getElementById("btn-ask");
+const chatInput = document.getElementById("chat-q");
 
-    try {
-      tbody.innerHTML = `<tr><td colspan="2" class="center">Comparing…</td></tr>`;
+async function sendQuestion() {
+  const q = chatInput.value.trim();
+  if (!q) return;
+  const useSess = document.getElementById("chat-sessionized").checked;
+  if (useSess && !currentSession) { toast("Build the index first.", "error"); return; }
 
-      const fd = new FormData();
-      fd.append("reference", ref); // <-- must be 'reference'
-      fd.append("actual", act);    // <-- must be 'actual'
+  addMessage("user", q);
+  chatInput.value = "";
+  const thinkEl = addThinking();
 
-      const res = await fetch(`${API_BASE}/compare`, { method: "POST", headers: { ...authHeader() }, body: fd });
-      if (!res.ok) {
-        const err = await res.json().catch(()=>({detail:res.statusText}));
-        throw new Error(err.detail || `HTTP ${res.status}`);
-      }
-      const json = await res.json(); // { rows: [...] }
-      const rows = json.rows || [];
-      if (!rows.length) {
-        tbody.innerHTML = `<tr><td colspan="2" class="muted center">No differences found.</td></tr>`;
-        return;
-      }
+  askBtn.disabled = true;
+  try {
+    const fd = new FormData();
+    fd.append("question", q);
+    fd.append("use_session_dirs", useSess ? "true" : "false");
+    fd.append("k", document.getElementById("chat-k").value || "5");
+    if (useSess && currentSession) fd.append("session_id", currentSession);
+    const mm = document.getElementById("chat-mm").checked;
+    fd.append("multimodal", mm ? "true" : "false");
+
+    const isAgent = useAgent.checked && !mm;
+    const endpoint = isAgent ? `${API_BASE}/chat/agent_query` : `${API_BASE}/chat/query`;
+
+    const res = await fetch(endpoint, { method: "POST", headers: { ...authHeader() }, body: fd });
+    if (!res.ok) { const e = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(e.detail || `HTTP ${res.status}`); }
+    const json = await res.json();
+    thinkEl.remove();
+    addMessage("assistant", json.answer || "No answer.", json.engine);
+  } catch (e) {
+    thinkEl.remove();
+    addMessage("assistant", "Error: " + (e.message || e));
+    toast("Query failed: " + (e.message || e), "error");
+  } finally {
+    askBtn.disabled = false;
+  }
+}
+
+askBtn.addEventListener("click", sendQuestion);
+chatInput.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendQuestion(); } });
+
+// ===== ANALYSIS — DROP ZONE =====
+const anFile = document.getElementById("an-file");
+anFile.addEventListener("change", () => {
+  const f = anFile.files[0];
+  document.getElementById("an-filename").textContent = f ? f.name : "";
+});
+setupDrop("an-drop", "an-file", "an-filename");
+
+document.getElementById("btn-analyze").addEventListener("click", async () => {
+  const file = anFile.files[0];
+  const out = document.getElementById("an-json");
+  if (!file) { toast("Please upload a file first.", "error"); return; }
+
+  const btn = document.getElementById("btn-analyze");
+  const orig = btn.innerHTML;
+  btn.classList.add("loading"); btn.innerHTML = "";
+  out.textContent = "Running analysis…";
+
+  try {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(`${API_BASE}/analyze`, { method: "POST", headers: { ...authHeader() }, body: fd });
+    if (!res.ok) { const e = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(e.detail || `HTTP ${res.status}`); }
+    out.textContent = JSON.stringify(await res.json(), null, 2);
+    toast("Analysis complete.", "success");
+  } catch (e) {
+    out.textContent = "Error: " + (e.message || e);
+    toast("Analysis failed: " + (e.message || e), "error");
+  } finally {
+    btn.classList.remove("loading"); btn.innerHTML = orig;
+  }
+});
+
+// ===== COMPARE — DROP ZONES =====
+setupDrop("ref-drop", "cmp-ref", "ref-filename");
+setupDrop("act-drop", "cmp-act", "act-filename");
+
+document.getElementById("btn-compare").addEventListener("click", async () => {
+  const ref = document.getElementById("cmp-ref").files[0];
+  const act = document.getElementById("cmp-act").files[0];
+  const tbody = document.querySelector("#cmp-table tbody");
+  if (!ref || !act) { toast("Upload both files first.", "error"); return; }
+
+  const btn = document.getElementById("btn-compare");
+  const orig = btn.innerHTML;
+  btn.classList.add("loading"); btn.innerHTML = "";
+  tbody.innerHTML = `<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:20px">Comparing…</td></tr>`;
+
+  try {
+    const fd = new FormData();
+    fd.append("reference", ref);
+    fd.append("actual", act);
+    const res = await fetch(`${API_BASE}/compare`, { method: "POST", headers: { ...authHeader() }, body: fd });
+    if (!res.ok) { const e = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(e.detail || `HTTP ${res.status}`); }
+    const json = await res.json();
+    const rows = json.rows || [];
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:20px">No differences found.</td></tr>`;
+    } else {
       tbody.innerHTML = rows.map(r => {
         const page = r.Page ?? r.page ?? "";
-        const chg  = r.Changes ?? r.changes ?? "";
-        return `<tr><td>${page}</td><td>${chg}</td></tr>`;
+        const chg = r.Changes ?? r.changes ?? "";
+        return `<tr><td class="td-page">${page}</td><td>${chg}</td></tr>`;
       }).join("");
-    } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="2" class="muted center">Error: ${e.message || e}</td></tr>`;
+    }
+    toast("Comparison complete.", "success");
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="2" style="text-align:center;color:var(--danger);padding:16px">${e.message || e}</td></tr>`;
+    toast("Comparison failed: " + (e.message || e), "error");
+  } finally {
+    btn.classList.remove("loading"); btn.innerHTML = orig;
+  }
+});
+
+// ===== HELPER: drag-drop for upload zones =====
+function setupDrop(zoneId, inputId, filenameId) {
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  const nameEl = document.getElementById(filenameId);
+  if (!zone || !input) return;
+  ["dragenter","dragover"].forEach(e => zone.addEventListener(e, ev => { ev.preventDefault(); zone.classList.add("drag-over"); }));
+  ["dragleave","drop"].forEach(e => zone.addEventListener(e, ev => { ev.preventDefault(); zone.classList.remove("drag-over"); }));
+  zone.addEventListener("drop", ev => {
+    if (ev.dataTransfer.files.length) {
+      const dt = new DataTransfer();
+      dt.items.add(ev.dataTransfer.files[0]);
+      input.files = dt.files;
+      if (nameEl) nameEl.textContent = ev.dataTransfer.files[0].name;
     }
   });
-
-  // ===== CHAT (index + ask) =====
-  let currentSession = null;
-
-  document.getElementById("btn-build").addEventListener("click", async () => {
-    const files     = document.getElementById("chat-files").files;
-    const sessionId = document.getElementById("chat-session").value.trim();
-    const useSess   = document.getElementById("chat-sessionized").checked;
-    const k         = +document.getElementById("chat-k").value || 5;
-    const chunk     = +document.getElementById("chat-chunk").value || 1000;
-    const overlap   = +document.getElementById("chat-overlap").value || 200;
-    const meta      = document.getElementById("chat-meta");
-
-    if (!files.length) { meta.textContent = "Please upload at least one file."; return; }
-
-    try {
-      meta.textContent = "Building index…";
-
-      const fd = new FormData();
-      [...files].forEach(f => fd.append("files", f)); // <-- must be 'files'
-      if (sessionId) fd.append("session_id", sessionId);
-      fd.append("use_session_dirs", useSess ? "true" : "false");
-      fd.append("chunk_size", String(chunk));
-      fd.append("chunk_overlap", String(overlap));
-      fd.append("k", String(k));
-      const mm = document.getElementById("chat-mm").checked;
-      fd.append("multimodal", mm ? "true" : "false");
-
-      const res = await fetch(`${API_BASE}/chat/index`, { method: "POST", headers: { ...authHeader() }, body: fd });
-      if (!res.ok) {
-        const err = await res.json().catch(()=>({detail:res.statusText}));
-        throw new Error(err.detail || `HTTP ${res.status}`);
-      }
-      const json = await res.json(); // { session_id, k, use_session_dirs }
-      currentSession = json.session_id || sessionId || null;
-      meta.textContent = `Indexed. session=${currentSession || "(none)"}, k=${json.k}`;
-    } catch (e) {
-      meta.textContent = "Indexing failed: " + (e.message || e);
-    }
-  });
-
-  document.getElementById("btn-ask").addEventListener("click", async () => {
-    const q        = document.getElementById("chat-q").value.trim();
-    const ans      = document.getElementById("chat-answer");
-    const useSess  = document.getElementById("chat-sessionized").checked;
-    const k        = +document.getElementById("chat-k").value || 5;
-
-    if (!q) { ans.textContent = "Please enter a question."; return; }
-    if (useSess && !currentSession) {
-      ans.textContent = "Build the index first (session-based mode is ON).";
-      return;
-    }
-
-    try {
-      ans.textContent = "Thinking…";
-
-      const fd = new FormData();
-      fd.append("question", q);
-      fd.append("use_session_dirs", useSess ? "true" : "false");
-      fd.append("k", String(k));
-      if (useSess && currentSession) fd.append("session_id", currentSession);
-      const mm = document.getElementById("chat-mm").checked;
-      fd.append("multimodal", mm ? "true" : "false");
-
-      const res = await fetch(`${API_BASE}/chat/query`, { method: "POST", headers: { ...authHeader() }, body: fd });
-      if (!res.ok) {
-        const err = await res.json().catch(()=>({detail:res.statusText}));
-        throw new Error(err.detail || `HTTP ${res.status}`);
-      }
-      const json = await res.json(); // { answer, ... }
-      ans.textContent = json.answer || "No answer.";
-    } catch (e) {
-      ans.textContent = "Query failed: " + (e.message || e);
-    }
-  });
+  input.addEventListener("change", () => { if (nameEl && input.files[0]) nameEl.textContent = input.files[0].name; });
+}
 </script>
-
 </body>
 </html>

@@ -19,6 +19,7 @@ DocVault is an AI document platform with **conversational RAG**, **agentic query
 </div>
 
 ---
+<img width="1916" height="966" alt="image" src="https://github.com/user-attachments/assets/74abb867-5eec-4d64-984c-45e9d0c0abbf" />
 
 
 ## Features
